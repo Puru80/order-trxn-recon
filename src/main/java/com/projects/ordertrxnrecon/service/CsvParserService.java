@@ -11,7 +11,9 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class CsvParserService {
@@ -21,6 +23,7 @@ public class CsvParserService {
 
     public List<Order> parseOrders(String csvContent, Long userId) throws CsvValidationException, IOException {
         List<Order> orders = new ArrayList<>();
+        Set<String> seenOrderIds = new HashSet<>();
 
         try (CSVReader reader = new CSVReader(new StringReader(csvContent))) {
             String[] header = reader.readNext();
@@ -31,7 +34,7 @@ public class CsvParserService {
             String[] line;
             while ((line = reader.readNext()) != null) {
                 String rawRow = String.join(",", line);
-                Order order = parseOrderRow(line, userId, rawRow);
+                Order order = parseOrderRow(line, userId, rawRow, seenOrderIds);
                 orders.add(order);
             }
         }
@@ -41,6 +44,7 @@ public class CsvParserService {
 
     public List<Payment> parsePayments(String csvContent, Long userId) throws CsvValidationException, IOException {
         List<Payment> payments = new ArrayList<>();
+        Set<String> seenTransactionRefs = new HashSet<>();
 
         try (CSVReader reader = new CSVReader(new StringReader(csvContent))) {
             String[] header = reader.readNext();
@@ -51,7 +55,7 @@ public class CsvParserService {
             String[] line;
             while ((line = reader.readNext()) != null) {
                 String rawRow = String.join(",", line);
-                Payment payment = parsePaymentRow(line, userId, rawRow);
+                Payment payment = parsePaymentRow(line, userId, rawRow, seenTransactionRefs);
                 payments.add(payment);
             }
         }
@@ -59,7 +63,7 @@ public class CsvParserService {
         return payments;
     }
 
-    private Order parseOrderRow(String[] line, Long userId, String rawRow) {
+    private Order parseOrderRow(String[] line, Long userId, String rawRow, Set<String> seenOrderIds) {
         List<String> errors = new ArrayList<>();
 
         String orderId = getSafeValue(line, 0);
@@ -73,6 +77,11 @@ public class CsvParserService {
 
         if (orderId == null || orderId.isBlank()) {
             errors.add("order_id is required");
+        } else {
+            String normalizedId = orderId.trim().toUpperCase();
+            if (!seenOrderIds.add(normalizedId)) {
+                errors.add("Duplicate order_id: " + orderId);
+            }
         }
 
         String rowStatus = errors.isEmpty() ? VALID : INVALID;
@@ -93,7 +102,7 @@ public class CsvParserService {
                 .build();
     }
 
-    private Payment parsePaymentRow(String[] line, Long userId, String rawRow) {
+    private Payment parsePaymentRow(String[] line, Long userId, String rawRow, Set<String> seenTransactionRefs) {
         List<String> errors = new ArrayList<>();
 
         String transactionRef = getSafeValue(line, 0);
@@ -108,6 +117,11 @@ public class CsvParserService {
 
         if (transactionRef == null || transactionRef.isBlank()) {
             errors.add("transaction_ref is required");
+        } else {
+            String normalizedRef = transactionRef.trim().toUpperCase();
+            if (!seenTransactionRefs.add(normalizedRef)) {
+                errors.add("Duplicate transaction_ref: " + transactionRef);
+            }
         }
 
         String rowStatus = errors.isEmpty() ? VALID : INVALID;

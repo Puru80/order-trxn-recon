@@ -5,6 +5,7 @@ import com.projects.ordertrxnrecon.entity.Order;
 import com.projects.ordertrxnrecon.entity.Payment;
 import com.projects.ordertrxnrecon.repository.OrderRepository;
 import com.projects.ordertrxnrecon.repository.PaymentRepository;
+import com.projects.ordertrxnrecon.repository.ReconciliationRecordRepository;
 import com.opencsv.exceptions.CsvValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class UploadService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final ReconciliationRecordRepository reconciliationRecordRepository;
     private final CsvParserService csvParserService;
 
     @Transactional
@@ -30,6 +32,7 @@ public class UploadService {
         String csvContent = new String(file.getBytes(), StandardCharsets.UTF_8);
         List<Order> orders = csvParserService.parseOrders(csvContent, userId);
 
+        reconciliationRecordRepository.deleteByUserId(userId);
         orderRepository.deleteByUserId(userId);
         orderRepository.saveAll(orders);
 
@@ -55,6 +58,7 @@ public class UploadService {
         String csvContent = new String(file.getBytes(), StandardCharsets.UTF_8);
         List<Payment> payments = csvParserService.parsePayments(csvContent, userId);
 
+        reconciliationRecordRepository.deleteByUserId(userId);
         paymentRepository.deleteByUserId(userId);
         paymentRepository.saveAll(payments);
 
