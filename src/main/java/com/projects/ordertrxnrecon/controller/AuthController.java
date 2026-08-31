@@ -25,4 +25,17 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<AuthResponse> logout(@RequestHeader("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().body(
+                    AuthResponse.builder().message("Missing or invalid Authorization header").build()
+            );
+        }
+
+        String token = authHeader.substring(7);
+        AuthResponse response = authService.logout(token);
+        return ResponseEntity.ok(response);
+    }
 }

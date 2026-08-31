@@ -57,4 +57,12 @@ public class AuthService {
                 .message("Login successful")
                 .build();
     }
+
+    public AuthResponse logout(String token) {
+        jwtService.blacklistToken(token);
+
+        return AuthResponse.builder()
+                .message("Logged out successfully")
+                .build();
+    }
 }
