@@ -47,6 +47,12 @@ public class ReconciliationRecord {
     private BigDecimal paymentAmount;
 
     @Column(precision = 12, scale = 2)
+    private BigDecimal fee;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal netSettled;
+
+    @Column(precision = 12, scale = 2)
     private BigDecimal difference;
 
     @Column(length = 50)

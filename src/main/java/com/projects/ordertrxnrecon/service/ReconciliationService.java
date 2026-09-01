@@ -174,6 +174,8 @@ public class ReconciliationService {
                     .append(escapeCsv(item.getSeverity())).append(",")
                     .append(item.getOrderAmount() != null ? item.getOrderAmount() : "0.00").append(",")
                     .append(item.getPaymentAmount() != null ? item.getPaymentAmount() : "0.00").append(",")
+                    .append(item.getFee() != null ? item.getFee() : "0.00").append(",")
+                    .append(item.getNetSettled() != null ? item.getNetSettled() : "0.00").append(",")
                     .append(item.getDifference() != null ? item.getDifference() : "0.00").append(",")
                     .append(escapeCsv(item.getOrderStatus())).append(",")
                     .append(escapeCsv(item.getPaymentStatus())).append(",")
@@ -200,6 +202,14 @@ public class ReconciliationService {
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal totalGatewayFees = validPayments.stream()
+                .map(p -> p.getFee() != null ? p.getFee() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalNetSettledValue = validPayments.stream()
+                .map(p -> p.getNetSettled() != null ? p.getNetSettled() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         BigDecimal totalValueReconciled = items.stream()
                 .filter(i -> "MATCHED".equals(i.getDiscrepancyType()) || "ROUNDING_DIFFERENCE".equals(i.getDiscrepancyType()))
                 .map(DiscrepancyItemDto::getOrderAmount)
@@ -223,6 +233,8 @@ public class ReconciliationService {
                 .invalidPaymentsCount(invalidPaymentsCount)
                 .totalOrderValue(totalOrderValue.setScale(2, RoundingMode.HALF_UP))
                 .totalPaymentValue(totalPaymentValue.setScale(2, RoundingMode.HALF_UP))
+                .totalGatewayFees(totalGatewayFees.setScale(2, RoundingMode.HALF_UP))
+                .totalNetSettledValue(totalNetSettledValue.setScale(2, RoundingMode.HALF_UP))
                 .totalValueReconciled(totalValueReconciled.setScale(2, RoundingMode.HALF_UP))
                 .totalValueInDispute(totalValueInDispute.setScale(2, RoundingMode.HALF_UP))
                 .totalMoneyAtRisk(totalMoneyAtRisk.setScale(2, RoundingMode.HALF_UP))
@@ -242,6 +254,8 @@ public class ReconciliationService {
                 .severity(dto.getSeverity())
                 .orderAmount(dto.getOrderAmount())
                 .paymentAmount(dto.getPaymentAmount())
+                .fee(dto.getFee())
+                .netSettled(dto.getNetSettled())
                 .difference(dto.getDifference())
                 .orderStatus(dto.getOrderStatus())
                 .paymentStatus(dto.getPaymentStatus())
@@ -261,6 +275,8 @@ public class ReconciliationService {
                 .severity(rec.getSeverity())
                 .orderAmount(rec.getOrderAmount())
                 .paymentAmount(rec.getPaymentAmount())
+                .fee(rec.getFee())
+                .netSettled(rec.getNetSettled())
                 .difference(rec.getDifference())
                 .orderStatus(rec.getOrderStatus())
                 .paymentStatus(rec.getPaymentStatus())
@@ -280,6 +296,8 @@ public class ReconciliationService {
             case "severity": return "severity";
             case "orderamount": return "orderAmount";
             case "paymentamount": return "paymentAmount";
+            case "fee": return "fee";
+            case "netsettled": return "netSettled";
             case "difference": return "difference";
             case "moneyatrisk": return "moneyAtRisk";
             default: return "id";
@@ -303,6 +321,8 @@ public class ReconciliationService {
                     .severity("CRITICAL")
                     .orderAmount(orderAmt)
                     .paymentAmount(BigDecimal.ZERO)
+                    .fee(BigDecimal.ZERO)
+                    .netSettled(BigDecimal.ZERO)
                     .difference(orderAmt)
                     .orderStatus(order.getStatus())
                     .paymentStatus("N/A")
@@ -319,6 +339,9 @@ public class ReconciliationService {
         BigDecimal totalCharged = charges.stream().map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalRefunded = refunds.stream().map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal netPaid = totalCharged.subtract(totalRefunded);
+
+        BigDecimal totalFee = payments.stream().map(p -> p.getFee() != null ? p.getFee() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netSettled = netPaid.subtract(totalFee);
 
         BigDecimal diff = orderAmt.subtract(netPaid);
         BigDecimal absDiff = diff.abs();
@@ -337,11 +360,13 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
                     .currency(orderCurr + " / " + pmtCurr)
-                    .details("Order currency (" + orderCurr + ") differs from payment processor currency (" + pmtCurr + ").")
+                    .details("Order currency (" + orderCurr + ") differs from payment processor currency (" + pmtCurr + "). Gateway Fee: $" + totalFee + ".")
                     .moneyAtRisk(orderAmt)
                     .build();
         }
@@ -357,6 +382,8 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
@@ -377,11 +404,13 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
                     .currency(orderCurr)
-                    .details("Order was charged " + charges.size() + " times. Total charged: $" + totalCharged + ".")
+                    .details("Order was charged " + charges.size() + " times. Total charged: $" + totalCharged + " (Gateway Fee: $" + totalFee + ").")
                     .moneyAtRisk(overcharge)
                     .build();
         }
@@ -396,6 +425,8 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
@@ -415,6 +446,8 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
@@ -434,6 +467,8 @@ public class ReconciliationService {
                     .severity("HIGH")
                     .orderAmount(orderAmt)
                     .paymentAmount(netPaid)
+                    .fee(totalFee)
+                    .netSettled(netSettled)
                     .difference(diff)
                     .orderStatus(order.getStatus())
                     .paymentStatus(firstPmtStatus)
@@ -454,11 +489,13 @@ public class ReconciliationService {
                         .severity("LOW")
                         .orderAmount(orderAmt)
                         .paymentAmount(netPaid)
+                        .fee(totalFee)
+                        .netSettled(netSettled)
                         .difference(diff)
                         .orderStatus(order.getStatus())
                         .paymentStatus(firstPmtStatus)
                         .currency(orderCurr)
-                        .details("Minor rounding difference of $" + diff + " between order net amount and payment amount.")
+                        .details("Minor rounding difference of $" + diff + " between order net amount and payment amount (Gateway Fee: $" + totalFee + ").")
                         .moneyAtRisk(absDiff)
                         .build();
             } else {
@@ -471,11 +508,13 @@ public class ReconciliationService {
                         .severity("HIGH")
                         .orderAmount(orderAmt)
                         .paymentAmount(netPaid)
+                        .fee(totalFee)
+                        .netSettled(netSettled)
                         .difference(diff)
                         .orderStatus(order.getStatus())
                         .paymentStatus(firstPmtStatus)
                         .currency(orderCurr)
-                        .details("Amount mismatch: order net amount is $" + orderAmt + " but payment amount is $" + netPaid + ".")
+                        .details("Amount mismatch: order net amount is $" + orderAmt + " but payment amount is $" + netPaid + " (Gateway Fee: $" + totalFee + ").")
                         .moneyAtRisk(absDiff)
                         .build();
             }
@@ -490,11 +529,13 @@ public class ReconciliationService {
                 .severity("NONE")
                 .orderAmount(orderAmt)
                 .paymentAmount(netPaid)
+                .fee(totalFee)
+                .netSettled(netSettled)
                 .difference(BigDecimal.ZERO)
                 .orderStatus(order.getStatus())
                 .paymentStatus(firstPmtStatus)
                 .currency(orderCurr)
-                .details("Order and payment match cleanly.")
+                .details("Order and payment match cleanly (Gateway Fee: $" + totalFee + ", Net Settled: $" + netSettled + ").")
                 .moneyAtRisk(BigDecimal.ZERO)
                 .build();
     }
@@ -504,6 +545,10 @@ public class ReconciliationService {
         BigDecimal totalPaid = payments.stream()
                 .map(p -> p.getAmount() != null ? p.getAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalFee = payments.stream()
+                .map(p -> p.getFee() != null ? p.getFee() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netSettled = totalPaid.subtract(totalFee);
 
         Payment firstPmt = payments.get(0);
         String pmtCurr = firstPmt.getCurrency() != null ? firstPmt.getCurrency().toUpperCase() : "USD";
@@ -517,11 +562,13 @@ public class ReconciliationService {
                 .severity("HIGH")
                 .orderAmount(BigDecimal.ZERO)
                 .paymentAmount(totalPaid)
+                .fee(totalFee)
+                .netSettled(netSettled)
                 .difference(totalPaid.negate())
                 .orderStatus("N/A")
                 .paymentStatus(firstPmt.getStatus())
                 .currency(pmtCurr)
-                .details("Payment settled in processor for order reference '" + firstPmt.getOrderReference() + "' but no order exists in store system.")
+                .details("Payment settled in processor for order reference '" + firstPmt.getOrderReference() + "' but no order exists in store system (Gateway Fee: $" + totalFee + ").")
                 .moneyAtRisk(totalPaid)
                 .build();
     }

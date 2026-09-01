@@ -20,6 +20,8 @@ public class DiscrepancyItemDto {
     private String severity;
     private BigDecimal orderAmount;
     private BigDecimal paymentAmount;
+    private BigDecimal fee;
+    private BigDecimal netSettled;
     private BigDecimal difference;
     private String orderStatus;
     private String paymentStatus;

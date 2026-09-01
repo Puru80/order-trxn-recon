@@ -19,6 +19,8 @@ public class ReconciliationSummaryDto {
     private long invalidPaymentsCount;
     private BigDecimal totalOrderValue;
     private BigDecimal totalPaymentValue;
+    private BigDecimal totalGatewayFees;
+    private BigDecimal totalNetSettledValue;
     private BigDecimal totalValueReconciled;
     private BigDecimal totalValueInDispute;
     private BigDecimal totalMoneyAtRisk;

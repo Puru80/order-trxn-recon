@@ -32,8 +32,8 @@ build/
 ### VS Code ###
 .vscode/
 
-.mvn
-
 FRONTEND_INSTRUCTIONS.md
 AGENTS.md
 comments.md
+.env
+*.csv
